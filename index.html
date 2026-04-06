@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Engenharia - Comunicação Visual</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        .step-btn { transition: all 0.3s; font-size: 10px; font-weight: bold; padding: 5px 10px; border-radius: 4px; border: 1px solid #ddd; }
+        .btn-active { background-color: #00ca72; color: white; border-color: #00ca72; }
+        .btn-waiting { background-color: #f5f5f5; color: #666; }
+        .btn-process { background-color: #0073ea; color: white; border-color: #0073ea; }
+    </style>
+</head>
+<body class="bg-gray-100 p-4 md:p-8">
+
+    <div class="max-w-7xl mx-auto">
+        <div class="flex justify-between items-center mb-6 bg-white p-6 rounded-lg shadow-sm">
+            <div>
+                <h1 class="text-2xl font-bold text-gray-800">Sistema de Gestão de OS</h1>
+                <p class="text-sm text-gray-500">Engenharia de Comunicação Visual - IIGD</p>
+            </div>
+            <div class="flex gap-2">
+                <button onclick="exportToCSV()" class="bg-white border border-gray-300 px-4 py-2 rounded text-sm hover:bg-gray-50">
+                    <i class="fas fa-file-excel mr-2 text-green-600"></i>Gerar Planilha
+                </button>
+                <button onclick="location.reload()" class="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700">
+                    <i class="fas fa-sync mr-2"></i>Gerar Dashboard
+                </button>
+            </div>
+        </div>
+
+        <div class="bg-white p-6 rounded-lg shadow-sm mb-8">
+            <h2 class="text-lg font-semibold mb-4 border-b pb-2">Nova Ordem de Serviço</h2>
+            <form id="osForm" class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div>
+                    <label class="block text-xs font-bold mb-1">Nº da OS *</label>
+                    <input type="text" id="osNumber" required class="w-full border rounded p-2 text-sm" placeholder="Ex: 2026-001">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold mb-1">Igreja (Centro de Custo) *</label>
+                    <input list="churches" id="churchName" required class="w-full border rounded p-2 text-sm" placeholder="Digite o nome..." onchange="autoFillChurch(this.value)">
+                    <datalist id="churches">
+                        </datalist>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold mb-1">Regional</label>
+                    <input type="text" id="regional" readonly class="w-full bg-gray-50 border rounded p-2 text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold mb-1">Tipo de Serviço</label>
+                    <select id="serviceType" class="w-full border rounded p-2 text-sm" onchange="calculateCosts()">
+                        <option value="">Selecione...</option>
+                        <option value="Adesivo do altar" data-price="8">Adesivo do altar</option>
+                        <option value="Adesivo da escolinha" data-price="8">Adesivo da escolinha</option>
+                        <option value="Adesivo de programação" data-price="8">Adesivo de programação</option>
+                        <option value="Letreiro Acrílico Metalon" data-price="180">Letreiro Acrílico/Metalon</option>
+                        <option value="Letreiro Acrílico ACM" data-price="250">Letreiro Acrílico/ACM</option>
+                        <option value="Letreiros em lona" data-price="35">Letreiros em lona</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold mb-1">Largura (m) *</label>
+                    <input type="number" step="0.01" id="width" required class="w-full border rounded p-2 text-sm" oninput="calculateCosts()">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold mb-1">Altura (m) *</label>
+                    <input type="number" step="0.01" id="height" required class="w-full border rounded p-2 text-sm" oninput="calculateCosts()">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold mb-1">Custo Interno</label>
+                    <input type="text" id="costInternal" readonly class="w-full bg-green-50 border rounded p-2 text-sm font-bold text-green-700">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold mb-1">Custo Terceiro</label>
+                    <input type="text" id="costExternal" readonly class="w-full bg-orange-50 border rounded p-2 text-sm font-bold text-orange-700">
+                </div>
+                <div class="md:col-span-4 flex justify-end">
+                    <button type="button" onclick="addOS()" class="bg-blue-600 text-white px-8 py-2 rounded font-bold hover:bg-blue-700">CRIAR OS</button>
+                </div>
+            </form>
+        </div>
+
+        <div class="bg-white rounded-lg shadow-sm overflow-hidden">
+            <table class="w-full text-left border-collapse">
+                <thead class="bg-gray-50 text-gray-600 text-xs uppercase font-bold">
+                    <tr>
+                        <th class="p-4 border-b">OS / Igreja</th>
+                        <th class="p-4 border-b">Regional / Pastor</th>
+                        <th class="p-4 border-b">Serviço / Dimensões</th>
+                        <th class="p-4 border-b text-center">Status Produção</th>
+                        <th class="p-4 border-b text-center">Instalação</th>
+                    </tr>
+                </thead>
+                <tbody id="osTableBody">
+                    </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        // BANCO DE DADOS (Exemplos extraídos da sua lista)
+        const churchDatabase = [
+            { name: "JARDIM VALE DAS VIRTUDES", regional: "CAMPO DE FORA", pastor: "Cristiane Ferreira", tel: "(11) 95352-8504" },
+            { name: "CAPÃO REDONDO", regional: "CAMPO DE FORA", pastor: "Claudimerison", tel: "(11) 96214-8129" },
+            { name: "BARUERI - CENTRO", regional: "CARAPICUIBA", pastor: "Bruno Ferreira", tel: "(11) 97685-4653" },
+            { name: "JANDIRA", regional: "CARAPICUIBA", pastor: "Paulo Jose", tel: "(11) 99888-8835" }
+        ];
+
+        // CONFIGURAÇÕES MAKE.COM (Webhook URL)
+        const MAKE_WEBHOOK = "https://hook.make.com/SEU_WEBHOOK_AQUI";
+
+        // Inicializar Datalist
+        const datalist = document.getElementById('churches');
+        churchDatabase.forEach(c => {
+            let option = document.createElement('option');
+            option.value = c.name;
+            datalist.appendChild(option);
+        });
+
+        function autoFillChurch(name) {
+            const info = churchDatabase.find(c => c.name === name);
+            if(info) {
+                document.getElementById('regional').value = info.regional;
+            }
+        }
+
+        function calculateCosts() {
+            const width = parseFloat(document.getElementById('width').value) || 0;
+            const height = parseFloat(document.getElementById('height').value) || 0;
+            const select = document.getElementById('serviceType');
+            const priceM2 = parseFloat(select.options[select.selectedIndex]?.dataset.price) || 0;
+
+            const area = width * height;
+            const internal = area * priceM2;
+            const external = area * (priceM2 * 2.5); // Simulação: Terceiro é 2.5x mais caro
+
+            document.getElementById('costInternal').value = "R$ " + internal.toFixed(2);
+            document.getElementById('costExternal').value = "R$ " + external.toFixed(2);
+        }
+
+        function addOS() {
+            const os = document.getElementById('osNumber').value;
+            const church = document.getElementById('churchName').value;
+            const regional = document.getElementById('regional').value;
+            const service = document.getElementById('serviceType').value;
+            const width = document.getElementById('width').value;
+            const height = document.getElementById('height').value;
+
+            if(!os || !church) { alert("Preencha OS e Igreja!"); return; }
+
+            const churchInfo = churchDatabase.find(c => c.name === church) || {};
+
+            const table = document.getElementById('osTableBody');
+            const row = table.insertRow(0);
+            row.className = "border-b hover:bg-gray-50 text-sm";
+            
+            row.innerHTML = `
+                <td class="p-4">
+                    <div class="font-bold text-blue-600">#${os}</div>
+                    <div class="text-gray-800">${church}</div>
+                </td>
+                <td class="p-4 text-xs">
+                    <div class="font-semibold">${regional}</div>
+                    <div>${churchInfo.pastor || 'Não informado'}</div>
+                </td>
+                <td class="p-4">
+                    <div class="text-xs font-bold uppercase">${service}</div>
+                    <div class="text-gray-500 text-[10px]">${width} x ${height}m</div>
+                </td>
+                <td class="p-4">
+                    <div class="flex gap-1 justify-center">
+                        <button onclick="updateStep(this, 'visita', '${os}')" class="step-btn btn-process">VISITA</button>
+                        <button onclick="updateStep(this, 'adalberto', '${os}')" class="step-btn btn-waiting">ADALBERTO</button>
+                        <button onclick="updateStep(this, 'aloisio', '${os}')" class="step-btn btn-waiting">ALOISIO</button>
+                        <button onclick="updateStep(this, 'producao', '${os}')" class="step-btn btn-waiting">PRODUÇÃO</button>
+                    </div>
+                </td>
+                <td class="p-4 text-center">
+                    <select class="text-[10px] border rounded p-1">
+                        <option>PENDENTE</option>
+                        <option>INTERNA</option>
+                        <option>TERCEIRIZADA</option>
+                    </select>
+                </td>
+            `;
+
+            // TRIGGER MAKE: Grupo Visual
+            sendToMake('novo_pedido', { os, church, regional, service });
+            document.getElementById('osForm').reset();
+        }
+
+        function updateStep(btn, step, os) {
+            btn.classList.remove('btn-process', 'btn-waiting');
+            btn.classList.add('btn-active');
+            btn.innerText = "✓ " + step.toUpperCase();
+
+            // Lógica de Gatilhos para o Make
+            if(step === 'visita') {
+                alert(`Mensagem enviada para Adalberto sobre a OS ${os}`);
+                sendToMake('visita_tecnica', { os });
+            }
+        }
+
+        async function sendToMake(action, data) {
+            console.log("Enviando para o Make:", action, data);
+            // fetch(MAKE_WEBHOOK, { method: 'POST', body: JSON.stringify({action, ...data}) });
+        }
+
+        function exportToCSV() {
+            alert("Gerando CSV com todas as OS do banco de dados...");
+        }
+    </script>
+</body>
+</html>
